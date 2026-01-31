@@ -1,62 +1,185 @@
-### encrypted-timeseries
+# Encrypted Time-Series Data Streaming Application
 
-### Problem Statement
+A real-time encrypted data streaming application built with Node.js, featuring three microservices that work together to generate, process, and visualize encrypted time-series data.
 
-Make a small backend application which can generate and emit an encrypted data stream over a socket, listens to incoming data stream on a socket, decrypts and decodes it, save to a time series db and then emit the saved data to a small frontend app. Backend services should be in Node JS. Please do not use AI to solve this assignment.
+## 🏗️ Architecture
 
+The application consists of three main services:
 
-## Emitter service
-This service should generate a periodic data stream of encrypted messages where the number of encrypted strings can be anywhere between 49-499 so randomise this to good effect.
+1. **Emitter Service** - Generates and encrypts random data streams
+2. **Listener Service** - Decrypts, validates, and stores data in MongoDB
+3. **Frontend Service** - Real-time dashboard for data visualization
 
-Each message should contain an object with 3 keys: `name, origin, destination` and a `secret_key` which is a hash of these 3 fields. randomize the values for `name, origin, destination` from a constant list provided in `data.json` file
+## 🚀 Features
 
+- **Real-time Data Streaming**: Socket.io-based communication between services
+- **AES-256-CTR Encryption**: Secure data transmission with integrity validation
+- **Time-Series Database**: Optimized MongoDB schema for time-series data
+- **Live Dashboard**: Real-time visualization with success rate monitoring
+- **Docker Support**: Complete containerization with docker-compose
+- **Error Handling**: Comprehensive error handling and logging
+- **Testing**: Unit tests with Jest
+- **Scalable Architecture**: Microservices-based design
+
+## 📋 Prerequisites
+
+- Node.js 18+ 
+- MongoDB 7+
+- Docker & Docker Compose (optional)
+
+## 🛠️ Installation & Setup
+
+### Option 1: Local Development
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd encrypted-timeseries
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start MongoDB**
+   ```bash
+   # Using Docker
+   docker run -d -p 27017:27017 --name mongodb mongo:7
+   
+   # Or use your local MongoDB installation
+   ```
+
+4. **Start the services** (in separate terminals)
+   ```bash
+   # Terminal 1: Start Listener Service
+   npm run dev:listener
+   
+   # Terminal 2: Start Frontend Service  
+   npm run dev:frontend
+   
+   # Terminal 3: Start Emitter Service
+   npm run dev:emitter
+   ```
+
+5. **Access the application**
+   - Frontend Dashboard: http://localhost:3000
+   - Listener API: http://localhost:3001
+
+### Option 2: Docker Deployment
+
+1. **Build and start all services**
+   ```bash
+   docker-compose up --build
+   ```
+
+2. **Access the application**
+   - Frontend Dashboard: http://localhost:3000
+   - All services will be automatically connected
+
+## 🔧 Configuration
+
+Environment variables are configured in `.env`:
+
+```env
+# Database Configuration
+MONGODB_URI=mongodb://localhost:27017/timeseries
+MONGODB_DATABASE=timeseries
+
+# Service Ports
+LISTENER_PORT=3001
+FRONTEND_PORT=3000
+
+# Service URLs
+LISTENER_URL=http://localhost:3001
+
+# Encryption Configuration
+ENCRYPTION_KEY=my-secret-encryption-key-32-chars!
+
+# Emitter Configuration
+EMIT_INTERVAL=10000
+MIN_MESSAGES=49
+MAX_MESSAGES=499
 ```
-exmaple
 
-originalMessage = {
-  name: 'Jack Reacher',
-  origin: 'Bengaluru',
-  destination: 'Mumbai'
-}
+## 🧪 Testing
 
-add a secret_key by creating a sha-256 hash of the above object
+Run the test suite:
 
-sumCheckMessage = {
-  name: 'Jack Reacher',
-  origin: 'Bengaluru',
-  destination: 'Mumbai',
-  secret_key: "sha-256 ash of originalMessage",
-}
-
-encrypt this payload using encryption algorithm `aes-256-ctr` with a pass key
-
-encryptedMessage = "encrypted message string"
+```bash
+npm test
 ```
 
-the data stream is long string of `|` separated encrypted messages and can look like this
+## 📊 Data Flow
 
-"e84742dedd1ddc924e5bfe9a5d912a1918e217f98e5578d04fd5c12426022240|4bbf088f4fc646d7a65b1f84172a59f665a09beb226368ff53d46a5edfd75dc6|3743c3ff07694a3e5540dfc14d57dcfdd6868439f9b5b83162be9162d8032999|26ccd3d082227c49907af7d3e4f19aec764f73d20b73ca4337df818b68cf6975|8d5c45f45be31d657dd58ae4e2c8222f61a779ad11fe36da7b00511ac2b5c01a|e97451a0c72d4202915f6c43b48bc4c0a500851e4c71b66b51b3a588e6522316|99624125591ebecb2c4e34695bf8d1e8a36b73087fd0c8e6c4fad087fa244d5c|b70ed78f5befa9c64ecd9ddcb64f18868ba86debf6b833ce440bcb772be3171c|a9bec91a127fb7b76a462fadeac5090b8dc753841f1fd54ac758f4cdb9af5fc0|2c345c51005cd0b0df92b089dba17e82e321725f539b1cdfceebd6eab69c336a"
+1. **Emitter Service**:
+   - Generates random messages from `data.json`
+   - Creates SHA-256 hash for data integrity
+   - Encrypts messages using AES-256-CTR
+   - Sends pipe-separated encrypted stream every 10 seconds
 
-The emitter service should connect to the listener service over sockets and periodically send out a new message stream every 10s
+2. **Listener Service**:
+   - Receives encrypted data streams via Socket.io
+   - Decrypts and validates message integrity
+   - Stores valid data in MongoDB time-series collections
+   - Forwards processed data to frontend
 
-## Listener Service
+3. **Frontend Service**:
+   - Displays real-time data stream
+   - Shows transmission success rates
+   - Provides live statistics dashboard
 
-The Listener service will allow an emitter to connect to it via sockets. On receipt of the encrypted message stream, the listener should decrypt this string and retrieve the data in the payload. Validate the objects using the secret_key to ensure data integrity. If the data integrity of any object is compromised then discard that operation and move on to the next in the queue.
+## 🗄️ Database Schema
 
-On successful object data integrity validation, add a timestamp to that object and save it to a mongoDB collection modelled for saving time-series data where each document should be corresponding to the minute in which it is received. e.g. for data received for a person between 14:00 to 14:01 all records are added in a single document as a timeseries. Design the schema is such a manner to allow for optimal performance for aggregation timeseries queries.
+The MongoDB schema is optimized for time-series queries:
 
-## Frontend
+```javascript
+{
+  timestamp: Date,        // Minute-level timestamp for grouping
+  count: Number,         // Number of records in this minute
+  data: [{               // Array of records for this minute
+    name: String,
+    origin: String,
+    destination: String,
+    secret_key: String,
+    receivedAt: Date
+  }]
+}
+```
 
-All the valid data saved should be displayed in a real-time manner on a small frontend app along with the success rate for data transmission and decoding
+## 🔒 Security Features
 
-### How will the assignment be evaluated?
-- Functionality: Is the app functional and performant?
-- Code Quality: Code Readability and structuring.
-- Exception Handling: No crashes and proper error messages logged.
-- Git Commit practices: Manage your code in github and make frequent commits.
-- Bonus consideration will be given if tests are also written.
-- Bonus for Dockerising the apps
+- **AES-256-CTR Encryption**: Industry-standard encryption algorithm
+- **SHA-256 Integrity Validation**: Ensures data hasn't been tampered with
+- **Input Validation**: Comprehensive validation of all incoming data
+- **Error Isolation**: Failed messages don't affect the entire stream
 
-### Submission
-Share the github repository and hosted app link with a readme on how to run the code. If you have any other doubts, get in touch with us
+## 📈 Performance Optimizations
+
+- **Time-Series Grouping**: Data grouped by minute for efficient queries
+- **Database Indexing**: Optimized indexes for time-series operations
+- **Connection Pooling**: Efficient database connection management
+- **Memory Management**: Limited frontend display items for performance
+
+## 🐳 Docker Services
+
+The application includes Docker configurations for:
+
+- **MongoDB**: Database service with persistent storage
+- **Listener**: API and socket server
+- **Emitter**: Data generation service  
+- **Frontend**: Web dashboard
+
+## 🔍 Monitoring & Debugging
+
+- **Health Endpoints**: `/health` endpoints for service monitoring
+- **Statistics API**: `/stats` endpoint for real-time metrics
+- **Comprehensive Logging**: Detailed logs for debugging
+- **Error Tracking**: Proper error handling and reporting
+
+## health endpoints:
+
+- Listener Health: http://localhost:3001/health
+- Listener Stats: http://localhost:3001/stats
+- Frontend Health: http://localhost:3000/health
 
