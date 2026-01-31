@@ -97,16 +97,17 @@ class EmitterService {
 
     this.socket.on('connect', () => {
       console.log('Connected to listener service');
-      // Don't auto-start emitting, wait for command
+      console.log('Emitter ready - waiting for start command from frontend');
+      console.log('Socket ID:', this.socket.id);
     });
 
     this.socket.on('startEmitting', () => {
-      console.log('Received start command from frontend');
+      console.log('Received START command from listener service');
       this.startEmitting();
     });
 
     this.socket.on('stopEmitting', () => {
-      console.log('Received stop command from frontend');
+      console.log('Received STOP command from listener service');
       this.stopEmitting();
     });
 
@@ -118,6 +119,13 @@ class EmitterService {
     this.socket.on('connect_error', (error) => {
       console.error('Connection error:', error.message);
     });
+    this.socket.onAny((eventName, ...args) => {
+      console.log('Received event:', eventName, 'with args:', args.length > 0 ? JSON.stringify(args).substring(0, 100) : 'none');
+    });
+
+    this.socket.on('error', (error) => {
+      console.error('Socket error:', error);
+    });
   }
 
   startEmitting() {
@@ -128,6 +136,14 @@ class EmitterService {
 
     console.log(`Starting to emit data every ${this.emitInterval}ms`);
     this.isEmitting = true;
+    
+    try {
+      const dataStream = this.generateDataStream();
+      console.log(`Emitting FIRST data stream with ${dataStream.split('|').length} messages`);
+      this.socket.emit('dataStream', dataStream);
+    } catch (error) {
+      console.error('Error generating/emitting first data stream:', error);
+    }
     
     this.emitTimer = setInterval(() => {
       try {

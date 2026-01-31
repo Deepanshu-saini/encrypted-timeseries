@@ -45,6 +45,16 @@ class FrontendService {
     this.io.on('connection', (socket) => {
       console.log('Frontend client connected:', socket.id);
 
+      socket.on('startEmitting', () => {
+        console.log('Frontend HTML requested START - forwarding to listener');
+        this.listenerSocket.emit('startEmitting');
+      });
+
+      socket.on('stopEmitting', () => {
+        console.log('Frontend HTML requested STOP - forwarding to listener');
+        this.listenerSocket.emit('stopEmitting');
+      });
+
       socket.on('disconnect', () => {
         console.log('Frontend client disconnected:', socket.id);
       });
@@ -53,21 +63,25 @@ class FrontendService {
 
   connectToListener() {
     const io = require('socket.io-client');
-    const listenerSocket = io(this.listenerUrl);
+    this.listenerSocket = io(this.listenerUrl, {
+      extraHeaders: {
+        'user-agent': 'frontend-service-proxy'
+      }
+    });
 
-    listenerSocket.on('connect', () => {
+    this.listenerSocket.on('connect', () => {
       console.log('Connected to listener service');
     });
 
-    listenerSocket.on('newData', (data) => {
+    this.listenerSocket.on('newData', (data) => {
       this.io.emit('newData', data);
     });
 
-    listenerSocket.on('disconnect', () => {
+    this.listenerSocket.on('disconnect', () => {
       console.log('Disconnected from listener service');
     });
 
-    listenerSocket.on('connect_error', (error) => {
+    this.listenerSocket.on('connect_error', (error) => {
       console.error('Error connecting to listener:', error.message);
     });
   }

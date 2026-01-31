@@ -31,6 +31,9 @@ class ListenerService {
       successRate: 0
     };
 
+    this.lastEmit = 0;
+    this.emitterSocket = null;
+    this.isEmitting = false;
     this.setupMiddleware();
     this.setupRoutes();
     this.setupSocketHandlers();
@@ -72,33 +75,97 @@ class ListenerService {
     this.app.get('/stats', (req, res) => {
       res.json({
         ...this.stats,
+        isEmitting: this.isEmitting,
+        emitterConnected: this.emitterSocket ? this.emitterSocket.connected : false,
         timestamp: new Date().toISOString()
       });
+    });
+
+    this.app.post('/debug/start', (req, res) => {
+      console.log('Manual START triggered via API');
+      this.isEmitting = true;
+      
+      if (this.emitterSocket && this.emitterSocket.connected) {
+        this.emitterSocket.emit('startEmitting');
+        res.json({ success: true, message: 'Start command sent to emitter' });
+      } else {
+        res.json({ success: false, message: 'Emitter not connected' });
+      }
+    });
+
+    this.app.post('/debug/stop', (req, res) => {
+      console.log('Manual STOP triggered via API');
+      this.isEmitting = false;
+      
+      if (this.emitterSocket && this.emitterSocket.connected) {
+        this.emitterSocket.emit('stopEmitting');
+        res.json({ success: true, message: 'Stop command sent to emitter' });
+      } else {
+        res.json({ success: false, message: 'Emitter not connected' });
+      }
     });
   }
 
   setupSocketHandlers() {
     this.io.on('connection', (socket) => {
-      console.log('Client connected:', socket.id);
+      const userAgent = socket.handshake.headers['user-agent'];
+      const isEmitter = !userAgent || (!userAgent.includes('Mozilla') && !userAgent.includes('frontend-service'));
+      const clientType = isEmitter ? 'Emitter' : 'Frontend';
+      
+      console.log(`${clientType} connected:`, socket.id);
+      console.log('User-Agent:', userAgent || 'none');
+      console.log('Is Emitter:', isEmitter);
+      if (isEmitter) {
+        this.emitterSocket = socket;
+        console.log('✅ Emitter service connected and ready');
+        console.log('🔍 Emitter socket stored:', this.emitterSocket.id);
+        
+        if (this.isEmitting) {
+          console.log('🔄 Resuming emission for reconnected emitter');
+          socket.emit('startEmitting');
+        }
+      }
 
       // Handle data stream from emitter
       socket.on('dataStream', (encryptedStream) => {
+        console.log('Received data stream from emitter');
         this.processDataStream(encryptedStream);
       });
 
       // Handle start/stop commands from frontend
       socket.on('startEmitting', () => {
-        console.log('Frontend requested to start emitting');
-        this.io.emit('startEmitting'); // Forward to emitter
+        console.log('Frontend requested to START emitting');
+        console.log('Current emitter socket:', this.emitterSocket ? this.emitterSocket.id : 'null');
+        console.log('Emitter connected:', this.emitterSocket ? this.emitterSocket.connected : false);
+        
+        this.isEmitting = true;
+        
+        if (this.emitterSocket && this.emitterSocket.connected) {
+          console.log('Sending START command to emitter:', this.emitterSocket.id);
+          this.emitterSocket.emit('startEmitting');
+          console.log('START command sent successfully');
+        } else {
+          console.log('Emitter not connected - will start when emitter connects');
+        }
       });
 
       socket.on('stopEmitting', () => {
-        console.log('Frontend requested to stop emitting');
-        this.io.emit('stopEmitting'); // Forward to emitter
+        console.log('Frontend requested to STOP emitting');
+        this.isEmitting = false;
+        
+        if (this.emitterSocket && this.emitterSocket.connected) {
+          console.log('Sending STOP command to emitter:', this.emitterSocket.id);
+          this.emitterSocket.emit('stopEmitting');
+        }
       });
 
       socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
+        console.log(`${clientType} disconnected:`, socket.id);
+        
+        if (socket === this.emitterSocket) {
+          this.emitterSocket = null;
+          console.log('Emitter service disconnected');
+        }
       });
     });
   }
@@ -154,6 +221,13 @@ class ListenerService {
       const minuteKey = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 
                                 now.getHours(), now.getMinutes());
 
+      // Check document size before adding more data
+      const existingDoc = await TimeSeriesModel.findOne({ timestamp: minuteKey });
+      if (existingDoc && existingDoc.data.length >= 500) {
+        console.warn('Minute document at capacity, skipping save to prevent bloat');
+        return;
+      }
+
       await TimeSeriesModel.findOneAndUpdate(
         { timestamp: minuteKey },
         {
@@ -168,8 +242,8 @@ class ListenerService {
         { upsert: true, new: true }
       );
 
-      // Emit to frontend
-      this.io.emit('newData', {
+      // Emit to frontend with rate limiting
+      this.emitToFrontend({
         ...validatedMessage,
         receivedAt: now,
         stats: this.stats
@@ -178,6 +252,13 @@ class ListenerService {
     } catch (error) {
       console.error('Database save error:', error);
       throw error;
+    }
+  }
+
+  emitToFrontend(data) {
+    if (!this.lastEmit || Date.now() - this.lastEmit > 1000) {
+      this.io.emit('newData', data);
+      this.lastEmit = Date.now();
     }
   }
 
