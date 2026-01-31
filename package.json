@@ -10,7 +10,10 @@
     "dev:emitter": "nodemon services/emitter/index.js",
     "dev:listener": "nodemon services/listener/index.js",
     "dev:frontend": "nodemon services/frontend/index.js",
-    "test": "jest"
+    "test": "jest",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up",
+    "docker:down": "docker-compose down"
   },
   "dependencies": {
     "express": "^4.18.2",
