@@ -13,6 +13,9 @@ class EmitterService {
     this.minMessages = parseInt(process.env.MIN_MESSAGES) || 49;
     this.maxMessages = parseInt(process.env.MAX_MESSAGES) || 499;
     this.listenerUrl = process.env.LISTENER_URL || 'http://localhost:3001';
+    
+    this.isEmitting = false;
+    this.emitTimer = null;
   }
 
   loadData() {
@@ -94,11 +97,22 @@ class EmitterService {
 
     this.socket.on('connect', () => {
       console.log('Connected to listener service');
+      // Don't auto-start emitting, wait for command
+    });
+
+    this.socket.on('startEmitting', () => {
+      console.log('Received start command from frontend');
       this.startEmitting();
+    });
+
+    this.socket.on('stopEmitting', () => {
+      console.log('Received stop command from frontend');
+      this.stopEmitting();
     });
 
     this.socket.on('disconnect', () => {
       console.log('Disconnected from listener service');
+      this.stopEmitting();
     });
 
     this.socket.on('connect_error', (error) => {
@@ -107,9 +121,15 @@ class EmitterService {
   }
 
   startEmitting() {
+    if (this.isEmitting) {
+      console.log('Already emitting data');
+      return;
+    }
+
     console.log(`Starting to emit data every ${this.emitInterval}ms`);
+    this.isEmitting = true;
     
-    setInterval(() => {
+    this.emitTimer = setInterval(() => {
       try {
         const dataStream = this.generateDataStream();
         console.log(`Emitting data stream with ${dataStream.split('|').length} messages`);
@@ -119,6 +139,21 @@ class EmitterService {
         console.error('Error generating/emitting data stream:', error);
       }
     }, this.emitInterval);
+  }
+
+  stopEmitting() {
+    if (!this.isEmitting) {
+      console.log('Already stopped emitting');
+      return;
+    }
+
+    console.log('Stopping data emission');
+    this.isEmitting = false;
+    
+    if (this.emitTimer) {
+      clearInterval(this.emitTimer);
+      this.emitTimer = null;
+    }
   }
 
   start() {
@@ -135,6 +170,7 @@ emitter.start();
 process.on('SIGINT', () => {
   console.log('\nShutting down emitter service...');
   if (emitter.socket) {
+    emitter.stopEmitting();
     emitter.socket.disconnect();
   }
   process.exit(0);

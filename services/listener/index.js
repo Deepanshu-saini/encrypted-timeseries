@@ -52,14 +52,26 @@ class ListenerService {
 
   setupSocketHandlers() {
     this.io.on('connection', (socket) => {
-      console.log('Emitter connected:', socket.id);
+      console.log('Client connected:', socket.id);
 
+      // Handle data stream from emitter
       socket.on('dataStream', (encryptedStream) => {
         this.processDataStream(encryptedStream);
       });
 
+      // Handle start/stop commands from frontend
+      socket.on('startEmitting', () => {
+        console.log('Frontend requested to start emitting');
+        this.io.emit('startEmitting'); // Forward to emitter
+      });
+
+      socket.on('stopEmitting', () => {
+        console.log('Frontend requested to stop emitting');
+        this.io.emit('stopEmitting'); // Forward to emitter
+      });
+
       socket.on('disconnect', () => {
-        console.log('Emitter disconnected:', socket.id);
+        console.log('Client disconnected:', socket.id);
       });
     });
   }

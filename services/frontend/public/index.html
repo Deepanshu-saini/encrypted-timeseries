@@ -36,6 +36,80 @@
             margin-bottom: 10px;
         }
 
+        .control-panel {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .control-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .start-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #218838, #1ea085);
+            transform: translateY(-2px);
+        }
+
+        .stop-btn {
+            background: linear-gradient(135deg, #dc3545, #e74c3c);
+            color: white;
+        }
+
+        .stop-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #c82333, #dc2626);
+            transform: translateY(-2px);
+        }
+
+        .clear-btn {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            color: white;
+        }
+
+        .clear-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #5a6268, #495057);
+            transform: translateY(-2px);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-indicator {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator.running {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            border: 2px solid #28a745;
+        }
+
+        .status-indicator.stopped {
+            background: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+            border: 2px solid #dc3545;
+        }
+
         .stats-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -175,6 +249,14 @@
         <div class="header">
             <h1>🔐 Encrypted Time-Series Dashboard</h1>
             <p>Real-time encrypted data stream monitoring</p>
+            
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <button id="startBtn" class="control-btn start-btn">▶️ Start Emitting</button>
+                <button id="stopBtn" class="control-btn stop-btn" disabled>⏹️ Stop Emitting</button>
+                <button id="clearBtn" class="control-btn clear-btn">🗑️ Clear Data</button>
+                <span id="statusIndicator" class="status-indicator stopped">⏸️ Stopped</span>
+            </div>
         </div>
 
         <div class="stats-container">
@@ -217,7 +299,63 @@
                 this.connectionStatus = document.getElementById('connectionStatus');
                 this.maxItems = 100; // Limit displayed items for performance
                 
+                // Control elements
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.statusIndicator = document.getElementById('statusIndicator');
+                this.isEmitting = false;
+                
                 this.setupSocketHandlers();
+                this.setupControlHandlers();
+            }
+
+            setupControlHandlers() {
+                this.startBtn.addEventListener('click', () => {
+                    this.startEmitting();
+                });
+
+                this.stopBtn.addEventListener('click', () => {
+                    this.stopEmitting();
+                });
+
+                this.clearBtn.addEventListener('click', () => {
+                    this.clearData();
+                });
+            }
+
+            clearData() {
+                this.dataList.innerHTML = '<div class="no-data"><p>Data cleared. Waiting for new data...</p></div>';
+                
+                // Reset stats
+                document.getElementById('totalReceived').textContent = '0';
+                document.getElementById('totalProcessed').textContent = '0';
+                document.getElementById('totalErrors').textContent = '0';
+                document.getElementById('successRate').textContent = '0%';
+            }
+
+            startEmitting() {
+                this.socket.emit('startEmitting');
+                this.updateControlState(true);
+            }
+
+            stopEmitting() {
+                this.socket.emit('stopEmitting');
+                this.updateControlState(false);
+            }
+
+            updateControlState(isEmitting) {
+                this.isEmitting = isEmitting;
+                this.startBtn.disabled = isEmitting;
+                this.stopBtn.disabled = !isEmitting;
+                
+                if (isEmitting) {
+                    this.statusIndicator.textContent = '▶️ Running';
+                    this.statusIndicator.className = 'status-indicator running';
+                } else {
+                    this.statusIndicator.textContent = '⏸️ Stopped';
+                    this.statusIndicator.className = 'status-indicator stopped';
+                }
             }
 
             setupSocketHandlers() {
