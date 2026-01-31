@@ -12,5 +12,8 @@ RUN npm ci --only=production
 COPY services/emitter/ ./services/emitter/
 COPY data.json ./
 
+# Expose port for Render
+EXPOSE 3002
+
 # Start the service
 CMD ["node", "services/emitter/index.js"]

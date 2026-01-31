@@ -2,6 +2,8 @@ const io = require('socket.io-client');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const express = require('express');
+const http = require('http');
 require('dotenv').config();
 
 class EmitterService {
@@ -13,9 +15,44 @@ class EmitterService {
     this.minMessages = parseInt(process.env.MIN_MESSAGES) || 49;
     this.maxMessages = parseInt(process.env.MAX_MESSAGES) || 499;
     this.listenerUrl = process.env.LISTENER_URL || 'http://localhost:3001';
+    this.port = process.env.PORT || 3002;
     
     this.isEmitting = false;
     this.emitTimer = null;
+
+    // Create simple HTTP server for Render
+    this.app = express();
+    this.server = http.createServer(this.app);
+    this.setupHttpServer();
+  }
+
+  setupHttpServer() {
+    this.app.get('/', (req, res) => {
+      res.json({
+        service: 'Emitter Service',
+        status: 'running',
+        isEmitting: this.isEmitting,
+        connected: this.socket ? this.socket.connected : false,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    this.app.get('/health', (req, res) => {
+      res.json({
+        status: 'healthy',
+        isEmitting: this.isEmitting,
+        socketConnected: this.socket ? this.socket.connected : false
+      });
+    });
+
+    this.app.get('/status', (req, res) => {
+      res.json({
+        isEmitting: this.isEmitting,
+        connected: this.socket ? this.socket.connected : false,
+        listenerUrl: this.listenerUrl,
+        emitInterval: this.emitInterval
+      });
+    });
   }
 
   loadData() {
@@ -174,6 +211,13 @@ class EmitterService {
 
   start() {
     console.log('Starting Emitter Service...');
+    
+    this.server.listen(this.port, () => {
+      console.log(`Emitter HTTP server running on port ${this.port}`);
+      console.log(`Status available at http://localhost:${this.port}/status`);
+    });
+    
+    // Then connect to listener
     this.connect();
   }
 }
