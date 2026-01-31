@@ -67,9 +67,18 @@ class ListenerService {
   decryptMessage(encryptedMessage) {
     try {
       const algorithm = 'aes-256-ctr';
-      const decipher = crypto.createDecipher(algorithm, this.encryptionKey);
+      const parts = encryptedMessage.split(':');
+      if (parts.length !== 2) {
+        throw new Error('Invalid encrypted message format');
+      }
       
-      let decrypted = decipher.update(encryptedMessage, 'hex', 'utf8');
+      const iv = Buffer.from(parts[0], 'hex');
+      const encryptedData = parts[1];
+      const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+      
+      const decipher = crypto.createDecipheriv(algorithm, key, iv);
+      
+      let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
       
       return JSON.parse(decrypted);

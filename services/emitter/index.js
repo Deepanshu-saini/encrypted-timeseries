@@ -53,12 +53,14 @@ class EmitterService {
     try {
       const algorithm = 'aes-256-ctr';
       const iv = crypto.randomBytes(16);
-      const cipher = crypto.createCipher(algorithm, this.encryptionKey);
+      const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+      
+      const cipher = crypto.createCipheriv(algorithm, key, iv);
       
       let encrypted = cipher.update(JSON.stringify(message), 'utf8', 'hex');
       encrypted += cipher.final('hex');
       
-      return encrypted;
+      return iv.toString('hex') + ':' + encrypted;
     } catch (error) {
       console.error('Encryption error:', error);
       throw error;

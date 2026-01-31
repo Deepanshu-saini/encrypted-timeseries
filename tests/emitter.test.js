@@ -34,19 +34,31 @@ class MockEmitterService {
 
   encryptMessage(message) {
     const algorithm = 'aes-256-ctr';
-    const cipher = crypto.createCipher(algorithm, this.encryptionKey);
+    const iv = crypto.randomBytes(16);
+    const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+    
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
     
     let encrypted = cipher.update(JSON.stringify(message), 'utf8', 'hex');
     encrypted += cipher.final('hex');
     
-    return encrypted;
+    return iv.toString('hex') + ':' + encrypted;
   }
 
   decryptMessage(encryptedMessage) {
     const algorithm = 'aes-256-ctr';
-    const decipher = crypto.createDecipher(algorithm, this.encryptionKey);
+    const parts = encryptedMessage.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted message format');
+    }
     
-    let decrypted = decipher.update(encryptedMessage, 'hex', 'utf8');
+    const iv = Buffer.from(parts[0], 'hex');
+    const encryptedData = parts[1];
+    const key = crypto.createHash('sha256').update(this.encryptionKey).digest();
+    
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    
+    let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     
     return JSON.parse(decrypted);
