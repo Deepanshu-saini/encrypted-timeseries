@@ -37,4 +37,8 @@ const timeSeriesSchema = new mongoose.Schema({
   collection: 'timeseries'
 });
 
+timeSeriesSchema.index({ timestamp: 1, 'data.receivedAt': 1 });
+
+timeSeriesSchema.index({ timestamp: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
 module.exports = mongoose.model('TimeSeries', timeSeriesSchema);
