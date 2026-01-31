@@ -169,7 +169,18 @@ class ListenerService {
     console.log(`Current success rate: ${this.stats.successRate}%`);
   }
 
+  async connectToDatabase() {
+    try {
+      await mongoose.connect(this.mongoUri);
+      console.log('Connected to MongoDB');
+    } catch (error) {
+      console.error('MongoDB connection error:', error);
+      process.exit(1);
+    }
+  }
+
   async start() {
+    await this.connectToDatabase();
     
     this.server.listen(this.port, () => {
       console.log(`Listener service running on port ${this.port}`);
@@ -180,3 +191,9 @@ class ListenerService {
 // Start the service
 const listener = new ListenerService();
 listener.start();
+
+process.on('SIGINT', async () => {
+  console.log('\nShutting down listener service...');
+  await mongoose.connection.close();
+  process.exit(0);
+});
