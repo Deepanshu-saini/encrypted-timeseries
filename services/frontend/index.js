@@ -83,3 +83,8 @@ class FrontendService {
 // Start the service
 const frontend = new FrontendService();
 frontend.start();
+
+process.on('SIGINT', () => {
+  console.log('\nShutting down frontend service...');
+  process.exit(0);
+});
