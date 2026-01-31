@@ -14,8 +14,9 @@ class ListenerService {
     this.server = http.createServer(this.app);
     this.io = socketIo(this.server, {
       cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
+        origin: process.env.CORS_ORIGIN || "*",
+        methods: ["GET", "POST"],
+        credentials: true
       }
     });
     
@@ -36,17 +37,43 @@ class ListenerService {
   }
 
   setupMiddleware() {
-    this.app.use(cors());
+    // CORS configuration for production
+    const corsOptions = {
+      origin: process.env.CORS_ORIGIN || "*",
+      methods: ["GET", "POST"],
+      credentials: true
+    };
+    
+    this.app.use(cors(corsOptions));
     this.app.use(express.json());
   }
 
   setupRoutes() {
-    this.app.get('/health', (req, res) => {
-      res.json({ status: 'healthy', stats: this.stats });
+    this.app.get('/health', async (req, res) => {
+      try {
+        // Check MongoDB connection
+        const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+        
+        res.json({ 
+          status: 'healthy', 
+          database: dbStatus,
+          stats: this.stats,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        res.status(500).json({ 
+          status: 'unhealthy', 
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
     });
 
     this.app.get('/stats', (req, res) => {
-      res.json(this.stats);
+      res.json({
+        ...this.stats,
+        timestamp: new Date().toISOString()
+      });
     });
   }
 
