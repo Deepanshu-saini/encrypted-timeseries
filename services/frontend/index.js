@@ -22,6 +22,7 @@ class FrontendService {
     this.setupMiddleware();
     this.setupRoutes();
     this.setupSocketHandlers();
+    this.connectToListener();
   }
 
   setupMiddleware() {
@@ -47,6 +48,27 @@ class FrontendService {
       socket.on('disconnect', () => {
         console.log('Frontend client disconnected:', socket.id);
       });
+    });
+  }
+
+  connectToListener() {
+    const io = require('socket.io-client');
+    const listenerSocket = io(this.listenerUrl);
+
+    listenerSocket.on('connect', () => {
+      console.log('Connected to listener service');
+    });
+
+    listenerSocket.on('newData', (data) => {
+      this.io.emit('newData', data);
+    });
+
+    listenerSocket.on('disconnect', () => {
+      console.log('Disconnected from listener service');
+    });
+
+    listenerSocket.on('connect_error', (error) => {
+      console.error('Error connecting to listener:', error.message);
     });
   }
 
