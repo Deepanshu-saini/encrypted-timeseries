@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: timeseries-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: timeseries
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - timeseries-network
+
+  listener:
+    build:
+      context: .
+      dockerfile: services/listener/Dockerfile
+    container_name: timeseries-listener
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/timeseries
+      - LISTENER_PORT=3001
+      - ENCRYPTION_KEY=my-secret-encryption-key-32-chars!
+    depends_on:
+      - mongodb
+    networks:
+      - timeseries-network
+
+  emitter:
+    build:
+      context: .
+      dockerfile: services/emitter/Dockerfile
+    container_name: timeseries-emitter
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - LISTENER_URL=http://listener:3001
+      - ENCRYPTION_KEY=my-secret-encryption-key-32-chars!
+      - EMIT_INTERVAL=10000
+      - MIN_MESSAGES=49
+      - MAX_MESSAGES=499
+    depends_on:
+      - listener
+    networks:
+      - timeseries-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+    container_name: timeseries-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - FRONTEND_PORT=3000
+      - LISTENER_URL=http://listener:3001
+    depends_on:
+      - listener
+    networks:
+      - timeseries-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  timeseries-network:
+    driver: bridge
